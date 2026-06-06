@@ -1,0 +1,31 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_routes_1 = __importDefault(require("../modules/auth/auth.routes"));
+const users_routes_1 = __importDefault(require("../modules/users/users.routes"));
+const guests_routes_1 = __importDefault(require("../modules/guests/guests.routes"));
+const room_types_routes_1 = __importDefault(require("../modules/room-types/room-types.routes"));
+const rooms_routes_1 = __importDefault(require("../modules/rooms/rooms.routes"));
+const bookings_routes_1 = __importDefault(require("../modules/bookings/bookings.routes"));
+const availability_routes_1 = __importDefault(require("../modules/availability/availability.routes"));
+const pricing_routes_1 = __importDefault(require("../modules/pricing/pricing.routes"));
+const reports_routes_1 = __importDefault(require("../modules/reports/reports.routes"));
+const media_routes_1 = __importDefault(require("../modules/gallery/media.routes"));
+const operations_routes_1 = __importDefault(require("../modules/operations/operations.routes"));
+const router = (0, express_1.Router)();
+// Mount all modules
+router.use('/auth', auth_routes_1.default);
+router.use('/users', users_routes_1.default);
+router.use('/guests', guests_routes_1.default);
+router.use('/room-types', room_types_routes_1.default);
+router.use('/rooms', rooms_routes_1.default);
+router.use('/bookings', bookings_routes_1.default);
+router.use('/availability', availability_routes_1.default);
+router.use('/pricing', pricing_routes_1.default);
+router.use('/reports', reports_routes_1.default);
+router.use('/media', media_routes_1.default);
+router.use('/operations', operations_routes_1.default);
+exports.default = router;

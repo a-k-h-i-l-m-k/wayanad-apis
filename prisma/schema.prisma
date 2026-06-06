@@ -1,0 +1,414 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. ROLE MANAGEMENT
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  permissions RolePermission[]
+  userRoles   UserRole[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// 2. USERS & STAFF
+model User {
+  id           String     @id @default(uuid())
+  firstName    String     @map("first_name")
+  lastName     String     @map("last_name")
+  email        String     @unique
+  phone        String?
+  avatar       String?
+  passwordHash String     @map("password_hash")
+  roleId       String?    @map("role_id")
+  status       String     @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  lastLogin    DateTime?  @map("last_login")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  role         Role?      @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  userRoles    UserRole[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+// 3. GUEST MANAGEMENT
+model Guest {
+  id             String    @id @default(uuid())
+  guestCode      String    @unique @map("guest_code")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  email          String    @unique
+  phone          String?
+  nationality    String?
+  passportNumber String?   @map("passport_number")
+  dateOfBirth    DateTime? @map("date_of_birth")
+  address        String?
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  bookings       Booking[]
+  reviews        Review[]
+
+  @@map("guests")
+}
+
+// 4. ROOM TYPES
+model RoomType {
+  id               String         @id @default(uuid())
+  name             String
+  slug             String         @unique
+  description      String?
+  basePrice        Decimal        @map("base_price") @db.Decimal(10, 2)
+  maxAdults        Int            @map("max_adults")
+  maxChildren      Int            @map("max_children")
+  maxOccupancy     Int            @map("max_occupancy")
+  sizeSqft         Int            @map("size_sqft")
+  viewType         String         @map("view_type")
+  extraBedAllowed  Boolean        @default(false) @map("extra_bed_allowed")
+  status           String         @default("ACTIVE") // ACTIVE, INACTIVE
+  rooms            Room[]
+  bookingRooms     BookingRoom[]
+  seasonalRates    SeasonalRate[]
+  specialRates     SpecialRate[]
+
+  @@map("room_types")
+}
+
+// 5. ROOMS
+model Room {
+  id                String        @id @default(uuid())
+  roomNumber        String        @unique @map("room_number")
+  roomTypeId        String        @map("room_type_id")
+  floor             String?
+  status            String        @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
+  maintenanceStatus String        @default("OPERATIONAL") @map("maintenance_status") // OPERATIONAL, UNDER_MAINTENANCE, OUT_OF_ORDER
+  remarks           String?
+  roomType          RoomType      @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookingRooms      BookingRoom[]
+
+  @@map("rooms")
+}
+
+// 6. BOOKING ENGINE
+model Booking {
+  id               String              @id @default(uuid())
+  bookingReference String              @unique @map("booking_reference")
+  guestId          String              @map("guest_id")
+  checkIn          DateTime            @map("check_in")
+  checkOut         DateTime            @map("check_out")
+  bookingStatus    String              @default("PENDING") @map("booking_status") // PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED
+  paymentStatus    String              @default("UNPAID") @map("payment_status") // UNPAID, PARTIALLY_PAID, PAID, REFUNDED
+  totalAmount      Decimal             @map("total_amount") @db.Decimal(10, 2)
+  taxAmount        Decimal             @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount   Decimal             @map("discount_amount") @db.Decimal(10, 2)
+  grandTotal       Decimal             @map("grand_total") @db.Decimal(10, 2)
+  bookingSource    String              @default("WEBSITE") @map("booking_source") // WEBSITE, ADMIN, BOOKING_AGENT, WALK_IN
+  createdAt        DateTime            @default(now()) @map("created_at")
+  guest            Guest               @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  bookingRooms     BookingRoom[]
+  payments         Payment[]
+  experienceBookings ExperienceBooking[]
+  reviews          Review[]
+
+  @@map("bookings")
+}
+
+model BookingRoom {
+  id         String         @id @default(uuid())
+  bookingId  String         @map("booking_id")
+  roomId     String?        @map("room_id")
+  roomTypeId String         @map("room_type_id")
+  adults     Int
+  children   Int
+  extraBeds  Int            @default(0) @map("extra_beds")
+  roomRate   Decimal        @map("room_rate") @db.Decimal(10, 2)
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  room       Room?          @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  roomType   RoomType       @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  childrenAges BookingChild[]
+
+  @@map("booking_rooms")
+}
+
+model BookingChild {
+  id            String      @id @default(uuid())
+  bookingRoomId String      @map("booking_room_id")
+  age           Int
+  bookingRoom   BookingRoom @relation(fields: [bookingRoomId], references: [id], onDelete: Cascade)
+
+  @@map("booking_children")
+}
+
+// 7. PRICING ENGINE
+model SeasonalRate {
+  id           String   @id @default(uuid())
+  roomTypeId   String   @map("room_type_id")
+  seasonName   String   @map("season_name")
+  startDate    DateTime @map("start_date")
+  endDate      DateTime @map("end_date")
+  weekdayPrice Decimal  @map("weekday_price") @db.Decimal(10, 2)
+  weekendPrice Decimal  @map("weekend_price") @db.Decimal(10, 2)
+  roomType     RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@map("seasonal_rates")
+}
+
+model SpecialRate {
+  id         String   @id @default(uuid())
+  roomTypeId String   @map("room_type_id")
+  date       DateTime
+  price      Decimal  @db.Decimal(10, 2)
+  reason     String?
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@map("special_rates")
+}
+
+// 8. PAYMENTS & REFUNDS
+model Payment {
+  id                   String    @id @default(uuid())
+  bookingId            String    @map("booking_id")
+  paymentMethod        String    @map("payment_method") // CREDIT_CARD, DEBIT_CARD, UPI, NET_BANKING, CASH, BANK_TRANSFER
+  amount               Decimal   @db.Decimal(10, 2)
+  status               String    @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  transactionReference String?   @map("transaction_reference")
+  paidAt               DateTime? @map("paid_at")
+  booking              Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  refunds              Refund[]
+
+  @@map("payments")
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  paymentId String   @map("payment_id")
+  amount    Decimal  @db.Decimal(10, 2)
+  reason    String?
+  status    String   @default("PENDING") // PENDING, COMPLETED, FAILED
+  createdAt DateTime @default(now()) @map("created_at")
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@map("refunds")
+}
+
+// 9. EXPERIENCES
+model Experience {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  duration    String?
+  capacity    Int
+  price       Decimal             @db.Decimal(10, 2)
+  status      String              @default("ACTIVE") // ACTIVE, INACTIVE
+  bookings    ExperienceBooking[]
+
+  @@map("experiences")
+}
+
+model ExperienceBooking {
+  id           String     @id @default(uuid())
+  bookingId    String     @map("booking_id")
+  experienceId String     @map("experience_id")
+  participants Int
+  amount       Decimal    @db.Decimal(10, 2)
+  bookingDate  DateTime   @default(now()) @map("booking_date")
+  booking      Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Restrict)
+
+  @@map("experience_bookings")
+}
+
+// 10. DINING
+model MenuCategory {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  menuItems MenuItem[]
+
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String       @id @default(uuid())
+  categoryId  String       @map("category_id")
+  name        String
+  description String?
+  price       Decimal      @db.Decimal(10, 2)
+  image       String?
+  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@map("menu_items")
+}
+
+// 11. GALLERY & MEDIA
+model Media {
+  id        String   @id @default(uuid())
+  type      String   @default("IMAGE") // IMAGE, VIDEO
+  url       String
+  thumbnail String?
+  category  String   @default("GALLERY") // ROOMS, GALLERY, BLOGS, EXPERIENCES, CMS
+  altText   String?  @map("alt_text")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("media")
+}
+
+// 12. BLOGS
+model Blog {
+  id             String    @id @default(uuid())
+  title          String
+  slug           String    @unique
+  excerpt        String?
+  content        String
+  featuredImage  String?   @map("featured_image")
+  seoTitle       String?   @map("seo_title")
+  seoDescription String?   @map("seo_description")
+  status         String    @default("DRAFT") // DRAFT, PUBLISHED
+  publishedAt    DateTime? @map("published_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("blogs")
+}
+
+// 13. REVIEWS
+model Review {
+  id        String   @id @default(uuid())
+  guestId   String   @map("guest_id")
+  bookingId String?  @map("booking_id")
+  rating    Int
+  review    String
+  featured  Boolean  @default(false)
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@map("reviews")
+}
+
+// 14. OFFERS
+model Offer {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  discountType  String    @map("discount_type") // PERCENTAGE, FIXED_AMOUNT
+  discountValue Decimal   @map("discount_value") @db.Decimal(10, 2)
+  startDate     DateTime  @map("start_date")
+  endDate       DateTime  @map("end_date")
+  usageLimit    Int?      @map("usage_limit")
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE
+
+  @@map("offers")
+}
+
+// 15. CMS BUILDER
+model CmsSection {
+  id           String   @id @default(uuid())
+  page         String
+  sectionKey   String   @unique @map("section_key")
+  title        String?
+  subtitle     String?
+  content      String?
+  mediaUrl     String?  @map("media_url")
+  displayOrder Int      @map("display_order")
+  enabled      Boolean  @default(true)
+  settingsJson Json?    @map("settings_json")
+
+  @@map("cms_sections")
+}
+
+// 16. WEBSITE SETTINGS
+model Setting {
+  id             String  @id @default(uuid())
+  resortName     String  @map("resort_name")
+  email          String
+  phone          String
+  whatsapp       String?
+  address        String
+  googleMapUrl   String? @map("google_map_url")
+  facebook       String?
+  instagram      String?
+  youtube        String?
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description")
+
+  @@map("settings")
+}
+
+// 17. ENQUIRIES
+model ContactEnquiry {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  message   String
+  status    String   @default("PENDING") // PENDING, RESPONDED, CLOSED
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_enquiries")
+}
+
+// 18. NOTIFICATIONS
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // BOOKING_CREATED, BOOKING_CANCELLED, PAYMENT_RECEIVED, ENQUIRY_RECEIVED, REVIEW_SUBMITTED
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// 19. AUDIT LOGS
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  module    String
+  recordId  String?  @map("record_id")
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
