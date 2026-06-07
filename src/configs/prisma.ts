@@ -7,7 +7,13 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Avoid logging every SQL statement — query logging adds noticeable
+    // per-request overhead. Keep warnings/errors only. Set PRISMA_QUERY_LOG=1
+    // to temporarily re-enable verbose query logging when debugging.
+    log:
+      process.env.PRISMA_QUERY_LOG === '1'
+        ? ['query', 'error', 'warn']
+        : ['error', 'warn'],
   });
 
 if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

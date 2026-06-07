@@ -18,6 +18,11 @@ export class RoomsController {
         ];
       }
 
+      // The Room model has no `createdAt` column (the default sort field), so map
+      // any unknown sort key to a column that actually exists on Room.
+      const sortableRoomFields = ['roomNumber', 'floor', 'status', 'maintenanceStatus'];
+      const sortBy = sortableRoomFields.includes(parsed.sortBy) ? parsed.sortBy : 'roomNumber';
+
       const [items, total] = await Promise.all([
         prisma.room.findMany({
           where,
@@ -26,7 +31,7 @@ export class RoomsController {
           },
           skip: parsed.skip,
           take: parsed.limit,
-          orderBy: { [parsed.sortBy]: parsed.sortOrder },
+          orderBy: { [sortBy]: parsed.sortOrder },
         }),
         prisma.room.count({ where }),
       ]);

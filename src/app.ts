@@ -9,8 +9,12 @@ import { env } from './configs/env';
 const app = express();
 
 // 1. Core middlewares
+// Reflect the request origin instead of using '*'. A wildcard origin combined
+// with `credentials: true` is rejected by browsers, which would block the admin
+// dashboard's authenticated (cookie-bearing) requests. Reflecting the origin
+// keeps credentialed CORS working from any front-end during development.
 app.use(cors({
-  origin: '*', // Adjust origins according to production deployment needs
+  origin: (_origin, callback) => callback(null, true),
   credentials: true,
 }));
 app.use(express.json());

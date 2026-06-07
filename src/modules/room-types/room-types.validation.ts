@@ -11,6 +11,8 @@ export const createRoomTypeSchema = z.object({
   sizeSqft: z.number().int().positive(),
   viewType: z.string().min(1),
   extraBedAllowed: z.boolean().default(false),
+  coverImage: z.string().nullable().optional(),
+  gallery: z.array(z.string()).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
 });
 

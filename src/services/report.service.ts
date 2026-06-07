@@ -221,58 +221,50 @@ export class ReportService {
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    // 1. Total rooms
-    const totalRooms = await prisma.room.count({
-      where: { maintenanceStatus: 'OPERATIONAL' },
-    });
-
-    // 2. Today's bookings counts (occupied or arriving)
-    const occupiedTodayCount = await prisma.bookingRoom.count({
-      where: {
-        booking: {
-          bookingStatus: { in: ['CONFIRMED', 'CHECKED_IN'] },
-          checkIn: { lte: today },
-          checkOut: { gt: today },
-        },
-      },
-    });
-
-    const checkInsTodayCount = await prisma.booking.count({
-      where: {
-        bookingStatus: 'CONFIRMED',
-        checkIn: { gte: today, lt: tomorrow },
-      },
-    });
-
-    const checkOutsTodayCount = await prisma.booking.count({
-      where: {
-        bookingStatus: 'CHECKED_IN',
-        checkOut: { gte: today, lt: tomorrow },
-      },
-    });
-
-    // 3. Current month financial totals
     const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const confirmedMonthBookings = await prisma.booking.findMany({
-      where: {
-        bookingStatus: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] },
-        createdAt: { gte: currentMonthStart },
-      },
-      select: {
-        grandTotal: true,
-      },
-    });
 
-    const currentMonthRevenue = confirmedMonthBookings.reduce((acc: number, curr: any) => acc + Number(curr.grandTotal), 0);
+    // Each round-trip to the remote DB costs ~60ms, and the connection pooler
+    // adds overhead under concurrency — so doing 7 queries (sequential OR
+    // parallel) is slow. Instead we compute every metric in ONE round-trip via
+    // a single SQL statement with scalar subqueries.
+    const rows = await prisma.$queryRaw<
+      Array<{
+        total_rooms: bigint;
+        occupied_today: bigint;
+        check_ins_today: bigint;
+        check_outs_today: bigint;
+        current_month_revenue: number | null;
+        pending_enquiries: bigint;
+        unread_notifications: bigint;
+      }>
+    >`
+      SELECT
+        (SELECT COUNT(*) FROM rooms WHERE maintenance_status = 'OPERATIONAL') AS total_rooms,
+        (SELECT COUNT(*) FROM booking_rooms br
+           JOIN bookings b ON b.id = br.booking_id
+          WHERE b.booking_status IN ('CONFIRMED','CHECKED_IN')
+            AND b.check_in <= ${today} AND b.check_out > ${today}) AS occupied_today,
+        (SELECT COUNT(*) FROM bookings
+          WHERE booking_status = 'CONFIRMED'
+            AND check_in >= ${today} AND check_in < ${tomorrow}) AS check_ins_today,
+        (SELECT COUNT(*) FROM bookings
+          WHERE booking_status = 'CHECKED_IN'
+            AND check_out >= ${today} AND check_out < ${tomorrow}) AS check_outs_today,
+        (SELECT COALESCE(SUM(grand_total), 0) FROM bookings
+          WHERE booking_status IN ('CONFIRMED','CHECKED_IN','CHECKED_OUT')
+            AND created_at >= ${currentMonthStart}) AS current_month_revenue,
+        (SELECT COUNT(*) FROM contact_enquiries WHERE status = 'PENDING') AS pending_enquiries,
+        (SELECT COUNT(*) FROM notifications WHERE read = false) AS unread_notifications
+    `;
 
-    // 4. Pending items
-    const pendingEnquiriesCount = await prisma.contactEnquiry.count({
-      where: { status: 'PENDING' },
-    });
-
-    const unreadNotificationsCount = await prisma.notification.count({
-      where: { read: false },
-    });
+    const r = rows[0];
+    const totalRooms = Number(r.total_rooms);
+    const occupiedTodayCount = Number(r.occupied_today);
+    const checkInsTodayCount = Number(r.check_ins_today);
+    const checkOutsTodayCount = Number(r.check_outs_today);
+    const currentMonthRevenue = Number(r.current_month_revenue ?? 0);
+    const pendingEnquiriesCount = Number(r.pending_enquiries);
+    const unreadNotificationsCount = Number(r.unread_notifications);
 
     return {
       today: {

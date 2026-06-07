@@ -103,6 +103,8 @@ model RoomType {
   sizeSqft         Int            @map("size_sqft")
   viewType         String         @map("view_type")
   extraBedAllowed  Boolean        @default(false) @map("extra_bed_allowed")
+  coverImage       String?        @map("cover_image")
+  gallery          String[]       @default([])
   status           String         @default("ACTIVE") // ACTIVE, INACTIVE
   rooms            Room[]
   bookingRooms     BookingRoom[]
@@ -237,6 +239,7 @@ model Experience {
   duration    String?
   capacity    Int
   price       Decimal             @db.Decimal(10, 2)
+  coverImage  String?             @map("cover_image")
   status      String              @default("ACTIVE") // ACTIVE, INACTIVE
   bookings    ExperienceBooking[]
 
@@ -378,6 +381,7 @@ model ContactEnquiry {
   name      String
   email     String
   phone     String?
+  subject   String?
   message   String
   status    String   @default("PENDING") // PENDING, RESPONDED, CLOSED
   notes     String?

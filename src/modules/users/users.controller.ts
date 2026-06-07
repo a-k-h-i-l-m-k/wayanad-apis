@@ -4,6 +4,7 @@ import { prisma } from '../../configs/prisma';
 import { parseQueryParams, formatPaginatedResponse } from '../../utils/query';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 import { logAudit } from '../../utils/audit';
+import { invalidateAuthCache } from '../../middleware/auth.middleware';
 
 export class UsersController {
   public getAll = async (req: Request, res: Response, next: NextFunction) => {
@@ -165,6 +166,10 @@ export class UsersController {
 
       const { passwordHash: _, ...rest } = user;
 
+      // Role/status may have changed — drop the cached auth entry so the next
+      // request for this user re-reads fresh permissions.
+      invalidateAuthCache(id);
+
       await logAudit({
         userId: actingUserId,
         action: 'UPDATE_USER',
@@ -196,6 +201,7 @@ export class UsersController {
       if (!user) throw new NotFoundError('User not found');
 
       await prisma.user.delete({ where: { id } });
+      invalidateAuthCache(id);
 
       await logAudit({
         userId: actingUserId,

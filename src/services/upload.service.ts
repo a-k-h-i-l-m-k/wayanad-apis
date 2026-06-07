@@ -1,11 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { env } from '../configs/env';
 import { BadRequestError } from '../utils/errors';
 
-// Initialize Supabase Client with service role key for full admin bypass of RLS policies for file management
+// Initialize Supabase Client with service role key for full admin bypass of RLS policies for file management.
+// Node.js < 22 has no native WebSocket, so supabase-js's realtime client crashes on init.
+// We only use Supabase for storage, but the realtime client is still constructed, so we supply
+// the `ws` package as its transport to satisfy initialization.
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     persistSession: false,
+  },
+  realtime: {
+    transport: ws as any,
   },
 });
 
