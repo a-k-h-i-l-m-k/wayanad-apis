@@ -25,6 +25,47 @@ export class BookingsController {
     }
   };
 
+  /**
+   * GET /bookings/my
+   * Authenticated: list bookings belonging to the user (matched by email).
+   */
+  public getMine = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userEmail = req.user!.email;
+
+      const guest = await prisma.guest.findUnique({ where: { email: userEmail } });
+      if (!guest) {
+        return res.status(200).json({ status: 'success', data: [] });
+      }
+
+      const bookings = await prisma.booking.findMany({
+        where: { guestId: guest.id },
+        include: {
+          guest: true,
+          bookingRooms: {
+            include: { roomType: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+
+      const formatted = bookings.map((b: any) => ({
+        ...b,
+        totalAmount: Number(b.totalAmount),
+        taxAmount: Number(b.taxAmount),
+        discountAmount: Number(b.discountAmount),
+        grandTotal: Number(b.grandTotal),
+      }));
+
+      res.status(200).json({ status: 'success', data: formatted });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+
+
   public getAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = parseQueryParams(req.query, ['bookingStatus', 'paymentStatus', 'bookingSource']);

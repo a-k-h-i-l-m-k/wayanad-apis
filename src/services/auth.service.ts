@@ -52,6 +52,15 @@ export class AuthService {
       { expiresIn: env.JWT_REFRESH_EXPIRES_IN as any }
     );
 
+    // Store refresh token in DB for revocation support
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + Number(env.JWT_REFRESH_EXPIRES_IN.replace('d', '')) * 24 * 60 * 60 * 1000),
+      },
+    });
+
     // Update last login
     await prisma.user.update({
       where: { id: user.id },
@@ -77,6 +86,14 @@ export class AuthService {
   public async refreshToken(token: string): Promise<{ accessToken: string }> {
     try {
       const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as { userId: string };
+
+      // Verify token exists in DB, not revoked, and not expired
+      const stored = await prisma.refreshToken.findUnique({
+        where: { token },
+      });
+      if (!stored || stored.revoked || stored.expiresAt < new Date()) {
+        throw new UnauthorizedError('Refresh token is expired or invalid');
+      }
       
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },

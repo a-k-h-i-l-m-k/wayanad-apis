@@ -22,10 +22,11 @@ export const requirePermission = (permission: string) => {
       return next(new UnauthorizedError());
     }
 
-    // SUPER_ADMIN has override access to everything
-    if (req.user.role.name === 'SUPER_ADMIN') {
+    // ADMIN and SUPER_ADMIN have override access to everything
+    if (req.user.role.name === 'SUPER_ADMIN' || req.user.role.name === 'ADMIN') {
       return next();
     }
+
 
     const hasPermission = req.user.role.permissions.includes(permission);
     if (!hasPermission) {

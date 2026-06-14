@@ -8,6 +8,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  registerSchema,
 } from './auth.validation';
 
 const router = Router();
@@ -39,6 +40,7 @@ const controller = new AuthController();
  *         description: Login successful
  */
 router.post('/login', validate({ body: loginSchema }), controller.login);
+router.post('/register', validate({ body: registerSchema }), controller.register);
 
 /**
  * @swagger

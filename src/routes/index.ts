@@ -10,10 +10,18 @@ import pricingRoutes from '../modules/pricing/pricing.routes';
 import reportsRoutes from '../modules/reports/reports.routes';
 import mediaRoutes from '../modules/gallery/media.routes';
 import operationsRoutes from '../modules/operations/operations.routes';
+import roleRoutes from '../modules/role/role.routes';
+import permissionRoutes from '../modules/permission/permission.routes';
+import reviewsRoutes from '../modules/reviews/reviews.routes';
+
 
 const router = Router();
 
-// Mount all modules
+// Role & Permission management (admin only)
+router.use('/roles', roleRoutes);
+router.use('/permissions', permissionRoutes);
+
+// Other modules
 router.use('/auth', authRoutes);
 router.use('/users', usersRoutes);
 router.use('/guests', guestsRoutes);
@@ -25,5 +33,7 @@ router.use('/pricing', pricingRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/media', mediaRoutes);
 router.use('/operations', operationsRoutes);
+router.use('/reviews', reviewsRoutes);
+
 
 export default router;

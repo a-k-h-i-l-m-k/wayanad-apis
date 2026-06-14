@@ -30,6 +30,16 @@ async function main() {
     { name: 'settings:manage', description: 'Manage system and resort configurations' },
     { name: 'reports:read', description: 'Access revenue and occupancy reports' },
     { name: 'audit-logs:read', description: 'View system audit logs' },
+    { name: 'roles:manage', description: 'Manage dynamic system roles and edit privileges' },
+    { name: 'permissions:read', description: 'View available clearance privileges list' },
+    
+    // Front-end customer permissions
+    { name: 'BOOKING_CREATE', description: 'Create bookings' },
+    { name: 'BOOKING_VIEW', description: 'View bookings' },
+    { name: 'REVIEW_SUBMIT', description: 'Submit reviews' },
+    { name: 'REVIEW_EDIT_OWN', description: 'Edit own reviews' },
+    { name: 'PROFILE_VIEW', description: 'View user profile' },
+    { name: 'PROFILE_EDIT', description: 'Edit user profile' },
   ];
 
   const permissions: any[] = [];
@@ -51,6 +61,7 @@ async function main() {
     { name: 'BOOKING_AGENT', description: 'View room availability and create bookings' },
     { name: 'FINANCE', description: 'Access revenue reports, payments, and refunds' },
     { name: 'CONTENT_EDITOR', description: 'Manage CMS, blogs, gallery, and menu items' },
+    { name: 'STAFF', description: 'Default staff role with limited permissions' },
   ];
 
   const roles: Record<string, any> = {};
@@ -64,7 +75,7 @@ async function main() {
   }
   console.log(`Seeded ${Object.keys(roles).length} roles.`);
 
-  // 3. Associate Permissions to Roles (RolePermission)
+  // 3. Associate Permissions to Roles
   // SUPER_ADMIN gets all permissions
   for (const perm of permissions) {
     await prisma.rolePermission.upsert({
@@ -77,6 +88,25 @@ async function main() {
       update: {},
       create: {
         roleId: roles['SUPER_ADMIN'].id,
+        permissionId: perm.id,
+      },
+    });
+  }
+
+  // STAFF gets limited permissions
+  const staffPermNames = ['BOOKING_CREATE', 'REVIEW_SUBMIT', 'REVIEW_EDIT_OWN', 'PROFILE_VIEW', 'PROFILE_EDIT'];
+  const staffPerms = permissions.filter(p => staffPermNames.includes(p.name));
+  for (const perm of staffPerms) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: roles['STAFF'].id,
+          permissionId: perm.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: roles['STAFF'].id,
         permissionId: perm.id,
       },
     });

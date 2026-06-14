@@ -59,6 +59,19 @@ router.use(authMiddleware);
 
 /**
  * @swagger
+ * /bookings/my:
+ *   get:
+ *     summary: Get current user's own bookings (by email match to guest record)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/my', controller.getMine);
+
+
+
+/**
+ * @swagger
  * /bookings:
  *   get:
  *     summary: Get all bookings (paginated, filtered, searchable)

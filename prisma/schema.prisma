@@ -52,23 +52,38 @@ model UserRole {
 
 // 2. USERS & STAFF
 model User {
-  id           String     @id @default(uuid())
-  firstName    String     @map("first_name")
-  lastName     String     @map("last_name")
-  email        String     @unique
-  phone        String?
-  avatar       String?
-  passwordHash String     @map("password_hash")
-  roleId       String?    @map("role_id")
-  status       String     @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
-  lastLogin    DateTime?  @map("last_login")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  role         Role?      @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  userRoles    UserRole[]
-  auditLogs    AuditLog[]
+  id            String         @id @default(uuid())
+  firstName     String         @map("first_name")
+  lastName      String         @map("last_name")
+  email         String         @unique
+  phone         String?
+  avatar        String?
+  passwordHash  String         @map("password_hash")
+  roleId        String?        @map("role_id")
+  status        String         @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  lastLogin     DateTime?      @map("last_login")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  role          Role?          @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  userRoles     UserRole[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
+
+// 2a. REFRESH TOKENS
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  revoked   Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
 
 // 3. GUEST MANAGEMENT
 model Guest {
